@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evening Drop Momos</title>
+<style>
+body { font-family: Arial; margin: 0; padding: 20px; background: #f8f8f8; }
+.container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
+h1, h2 { color: #d63447; text-align: center; }
+.menu-item { border-bottom: 1px solid #eee; padding: 15px 0; display: flex; justify-content: space-between; }
+.quantity-btn { background: #d63447; color: white; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; }
+.order-summary { background: #f9f9f9; padding: 15px; border-radius: 5px; margin-top: 20px; }
+input[type="text"], input[type="tel"] { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; }
+button { background: #d63447; color: white; border: none; padding: 12px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; width: 100%; }
+#payment-section { display: none; text-align: center; margin-top: 20px; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🍜 Evening Drop Momos</h1>
+<p style="text-align: center;">Apne favorite momos order karein! (Maximum order: ₹200)</p>
+<h2>Hamara Menu</h2>
+<div id="menu"></div>
+<div class="order-summary">
+<h3>Aapka Order</h3>
+<div id="order-items"></div>
+<p><strong>Total: ₹<span id="order-total">0</span></strong></p>
+</div>
+<div id="checkout-form">
+<h3>Customer Details</h3>
+<input type="text" id="customer-name" placeholder="Aapka Naam" required>
+<input type="tel" id="customer-phone" placeholder="Aapka Phone Number" required>
+<button onclick="placeOrder()">Order Place Karen & UPI Payment Link Payen</button>
+</div>
+<div id="payment-section">
+<h3>Payment Complete Karein</h3>
+<p>QR code scan karen ya niche diye link par click karke UPI se payment karen.</p>
+<p><strong>Order Amount: ₹<span id="payable-amount">0</span></strong></p>
+<p><a id="payment-link" href="#" target="_blank">Yahan Click Karke UPI Se Pay Karen</a></p>
+<p><em>Payment ke baad aapka order confirm ho jayega.</em></p>
+</div>
+</div>
+<script>
+let menu = []; 
+let cart = []; 
+// Page load par menu load karna
+window.onload = async function() {
+    try {
+        const response = await fetch('/api/menu');
+        menu = await response.json();
+        displayMenu(menu);
+    } catch (error) {
+        console.error("Menu load nahi hua:", error);
+    }
+};
+
+function displayMenu(menuItems) {
+    const menuContainer = document.getElementById('menu');
+    menuContainer.innerHTML = '';
+    menuItems.forEach(item => {
+        const menuItemElement = document.createElement('div');
+        menuItemElement.className = 'menu-item';
+        menuItemElement.innerHTML = `
+            <div>
+                <strong>${item.name}</strong> - ₹${item.price} 
+                <div>${item.description}</div>
+            </div>
+            <div>
+                <button class="quantity-btn" onclick="changeQuantity(${item.id}, -1)">-</button>
+                <span id="qty-${item.id}">0</span>
+                <button class="quantity-btn" onclick="changeQuantity(${item.id}, 1)">+</button>
+            </div>
+        `;
+        menuContainer.appendChild(menuItemElement);
+    });
+}
+
+function changeQuantity(itemId, change) {
+    const currentQty = cart.find(item => item.id === itemId)?.quantity || 0;
+    const newQty = Math.max(0, currentQty + change);
+
+    // Cart update karna
+    const existingItemIndex = cart.findIndex(item => item.id === itemId);
+    if (existingItemIndex > -1) {
+        if (newQty === 0) {
+            cart.splice(existingItemIndex, 1);
+        } else {
+            cart[existingItemIndex].quantity = newQty;
+        }
+    } else if (newQty > 0) {
+        cart.push({ id: itemId, quantity: newQty });
+    }
+
+    // UI update karna
+    document.getElementById(`qty-${itemId}`).textContent = newQty;
+    updateOrderSummary();
+}
+
+function updateOrderSummary() {
+    const orderItemsContainer = document.getElementById('order-items');
+    let total = 0;
+    orderItemsContainer.innerHTML = '';
+    cart.forEach(cartItem => {
+        const menuItem = menu.find(item => item.id === cartItem.id);
+        if (menuItem) {
+            const itemTotal = menuItem.price * cartItem.quantity;
+            total += itemTotal;
+            const itemElement = document.createElement('div');
+            itemElement.textContent = `${menuItem.name} x ${cartItem.quantity} = ₹${itemTotal}`;
+            orderItemsContainer.appendChild(itemElement);
+        }
+    });
+    document.getElementById('order-total').textContent = total;
+}
+
+async function placeOrder() {
+    const customerName = document.getElementById('customer-name').value;
+    const customerPhone = document.getElementById('customer-phone').value;
+
+    if (!customerName || !customerPhone) {
+        alert("Kripya apna naam aur phone number dalen.");
+        return;
+    }
+
+    if (cart.length === 0) {
+        alert("Aapka cart khali hai. Kuch momos add karen!");
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/order', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                customer_name: customerName,
+                customer_phone: customerPhone,
+                items: cart
+            }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Payment section show karna
+            document.getElementById('payable-amount').textContent = result.total;
+            const paymentLinkElement = document.getElementById('payment-link');
+            paymentLinkElement.href = result.payment_link;
+            paymentLinkElement.textContent = `₹${result.total} UPI Se Pay Karen`;
+
+            document.getElementById('payment-section').style.display = 'block';
+            document.getElementById('checkout-form').style.display = 'none';
+
+            // Cart reset karna
+            cart = [];
+            updateOrderSummary();
+
+            alert(`Order #${result.order_id} successful! Payment complete karen.`);
+        } else {
+            alert("Error: " + result.error);
+        }
+
+    } catch (error) {
+        alert("Order place nahi ho paya. Phir try karen.");
+    }
+}
+</script>
+</body>
+</html>
