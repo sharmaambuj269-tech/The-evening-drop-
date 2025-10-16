@@ -1,20 +1,10 @@
+// vercel.json में ये सेटिंग्स ऐड करें
 {
   "version": 2,
   "builds": [
     {
-      "src": "app.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "15mb",
-        "runtime": "python3.9",
-        "installCommand": "pip install -r requirements.txt"
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "app.py"
+      "src": "package.json",
+      "use": "@vercel/static-build"
     }
   ]
 }
