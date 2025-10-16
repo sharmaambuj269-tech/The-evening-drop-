@@ -16,5 +16,6 @@
       "src": "/(.*)",
       "dest": "app.py"
     }
-  ]
+  ],
+  "startCommand": "gunicorn app:app"  // <--- यह नई लाइन है
 }
