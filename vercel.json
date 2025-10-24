@@ -11,5 +11,6 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ]
+  ],
+  "startCommand": "gunicorn app:app"  // <--- यह नई लाइन है
 }
